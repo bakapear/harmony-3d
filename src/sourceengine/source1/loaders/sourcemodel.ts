@@ -9,6 +9,7 @@ import { CalcPose2, StudioFrames2 } from '../animations/calcanimations2';
 import { Source1ModelInstance } from '../models/source1modelinstance';
 import { BONE_USED_BY_ANYTHING, MdlBone } from './mdlbone';
 import { MeshTest } from './source1mdlloader';
+import { SourcePhyFileData } from './source1phyfile';
 import { MdlAttachment, MdlBodyPart, SourceMdl } from './sourcemdl';
 import { SourceVtx } from './sourcevtx';
 import { SourceVvd } from './sourcevvd';
@@ -47,6 +48,8 @@ export class SourceModel {
 
 		//this.geometries = new Set();
 	}
+
+	phyData?: SourcePhyFileData;
 
 	addGeometry(mesh: MeshTest, geometry: BufferGeometry, bodyPartName: string, bodyPartModelId: number): void {
 		const modelMesh = new SourceModelMesh(mesh, geometry);

@@ -2,8 +2,11 @@ import { VERBOSE } from '../../../buildoptions';
 import { Float32BufferAttribute, Uint32BufferAttribute } from '../../../geometry/bufferattribute';
 import { BufferGeometry } from '../../../geometry/buffergeometry';
 import { getLoader, registerLoader } from '../../../loaders/loaderfactory';
+import { Repositories } from '../../../repositories/repositories';
 import { Property, PropertyType } from '../../../utils/properties';
+import { BinaryReader } from 'harmony-binary-reader';
 import { Source1MdlLoader } from './source1mdlloader';
+import { Source1PhyFile, SourcePhyFileData } from './source1phyfile';
 import { Source1VtxLoader } from './source1vtxloader';
 import { Source1VvdLoader } from './source1vvdloader';
 import { SourceMdl } from './sourcemdl';
@@ -27,10 +30,11 @@ export class ModelLoader {
 
 				const vvdPromise = new Source1VvdLoader().load(repositoryName, fileName + '.vvd');
 				const vtxPromise = new Source1VtxLoader(mdl.header.formatVersionID).load(repositoryName, fileName + '.dx90.vtx');
+				const phyPromise = this.#loadPhy(repositoryName, fileName);
 
-				Promise.all([vvdPromise, vtxPromise]).then(([vvd, vtx]) => {
+				Promise.all([vvdPromise, vtxPromise, phyPromise]).then(([vvd, vtx, phyData]) => {
 					if (vvd && vtx) {
-						this.#fileLoaded(resolve, repositoryName, fileName, mdl, vvd, vtx);
+						this.#fileLoaded(resolve, repositoryName, fileName, mdl, vvd, vtx, phyData);
 					}
 				});
 			})();
@@ -38,7 +42,20 @@ export class ModelLoader {
 		return promise;
 	}
 
-	#fileLoaded(resolve: (value: SourceModel | null) => void, repositoryName: string, fileName: string, mdl: SourceMdl, vvd: SourceVvd, vtx: SourceVtx): void {
+	async #loadPhy(repositoryName: string, fileName: string): Promise<SourcePhyFileData | null> {
+		try {
+			const response = await Repositories.getFileAsArrayBuffer(repositoryName, fileName + '.phy');
+			if (!response.error && response.buffer) {
+				const reader = new BinaryReader(response.buffer);
+				return Source1PhyFile.parse(reader);
+			}
+		} catch {
+			// no phy file for model
+		}
+		return null;
+	}
+
+	#fileLoaded(resolve: (value: SourceModel | null) => void, repositoryName: string, fileName: string, mdl: SourceMdl, vvd: SourceVvd, vtx: SourceVtx, phyData?: SourcePhyFileData | null): void {
 		const requiredLod = 0;
 		const vertices = [];
 		const normals = [];
@@ -54,6 +71,7 @@ export class ModelLoader {
 			return;
 		}
 		const newSourceModel = new SourceModel(repositoryName, fileName, mdl, vvd, vtx);
+		newSourceModel.phyData = phyData ?? undefined;
 
 		for (const i of vertexArray) {
 			vertices.push(...i.m_vecPosition);

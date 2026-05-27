@@ -16,7 +16,8 @@ import { HasHitBoxes } from '../../../interfaces/hashitboxes';
 import { HasMaterials } from '../../../interfaces/hasmaterials';
 import { HasSkeleton } from '../../../interfaces/hasskeleton';
 import { RandomPointOnModel } from '../../../interfaces/randompointonmodel';
-import { Material } from '../../../materials/material';
+import { LineMaterial } from '../../../materials/linematerial';
+import { Material, MaterialColorMode } from '../../../materials/material';
 import { MeshBasicMaterial } from '../../../materials/meshbasicmaterial';
 import { vec3RandomBox } from '../../../math/functions';
 import { Hitbox } from '../../../misc/hitbox';
@@ -25,6 +26,7 @@ import { Bone } from '../../../objects/bone';
 import { Mesh } from '../../../objects/mesh';
 import { SkeletalMesh } from '../../../objects/skeletalmesh';
 import { Skeleton } from '../../../objects/skeleton';
+import { LineSegmentsGeometry } from '../../../primitives/geometries/linesegmentsgeometry';
 import { Scene } from '../../../scenes/scene';
 import { Interaction } from '../../../utils/interaction';
 import { getRandomInt } from '../../../utils/random';
@@ -34,6 +36,7 @@ import { MdlStudioSeqDesc } from '../loaders/mdlstudioseqdesc';
 import { MdlStudioFlex, MeshTest } from '../loaders/source1mdlloader';
 import { SourceAnimation } from '../loaders/sourceanimation';
 import { MAX_STUDIO_FLEX_DESC } from '../loaders/sourcemdl';
+import { SourcePhyFileData } from '../loaders/source1phyfile';
 import { SourceModel } from '../loaders/sourcemodel';
 import { Source1MaterialManager } from '../materials/source1materialmanager';
 import { Source1ModelManager } from '../models/source1modelmanager';
@@ -65,6 +68,9 @@ export class Source1ModelInstance extends Entity implements Animated, HasMateria
 	isDynamic: boolean;
 	#sheen?: vec3;
 	#tint: vec4 | null = null;
+	#collisionWireframeGroup: Entity | null = null;
+	#collisionWireframeMat: LineMaterial | null = null;
+	#collisionWireframeVisible = false;
 	static useNewAnimSystem = false;
 	useNewAnimSystem = false;
 	#animationList: Source1ModelAnimation[] = [];
@@ -969,6 +975,116 @@ export class Source1ModelInstance extends Entity implements Animated, HasMateria
 		return hitboxes;
 	}
 
+	get collisionWireframeVisible(): boolean {
+		return this.#collisionWireframeVisible;
+	}
+
+	set collisionWireframeVisible(visible: boolean) {
+		this.#collisionWireframeVisible = visible;
+		if (visible) {
+			this.#buildCollisionWireframe();
+		}
+		if (this.#collisionWireframeGroup) {
+			this.#collisionWireframeGroup.visible = visible;
+		}
+	}
+
+	get hasCollisionMesh(): boolean {
+		return !!(this.sourceModel.phyData?.collisionDatas?.length);
+	}
+
+	#buildCollisionWireframe(): void {
+		if (this.#collisionWireframeGroup) return;
+
+		const phyData = this.sourceModel.phyData;
+		if (!phyData) return;
+
+		const group = new Entity();
+		group.name = 'collision-wireframe';
+
+		const lineMat = new LineMaterial({ lineWidth: 2, colorMode: MaterialColorMode.PerMesh, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+		lineMat.setMeshColor([0, 1, 1, 1]);
+		this.#collisionWireframeMat = lineMat;
+
+		const hullMin = this.sourceModel.mdl.header.hull_min;
+		const hullMax = this.sourceModel.mdl.header.hull_max;
+		const hullRange = [
+			hullMax[0]! - hullMin[0]!,
+			hullMax[1]! - hullMin[1]!,
+			hullMax[2]! - hullMin[2]!
+		];
+
+		for (const solid of phyData.collisionDatas) {
+			const verts = solid.vertices;
+			const vi = solid.vertexIdToIndex;
+
+			// phy-space bounding box
+			const phyMin = [Infinity, Infinity, Infinity];
+			const phyMax = [-Infinity, -Infinity, -Infinity];
+			for (let i = 0; i < verts.length; i += 3) {
+				for (let j = 0; j < 3; j++) {
+					const v = verts[i + j]!;
+					if (v < phyMin[j]!) phyMin[j] = v;
+					if (v > phyMax[j]!) phyMax[j] = v;
+				}
+			}
+			const phyRange = [
+				phyMax[0]! - phyMin[0]!,
+				phyMax[1]! - phyMin[1]!,
+				phyMax[2]! - phyMin[2]!
+			];
+
+			// phy vertex to model space:
+			// phy.x -> world.x,  phy.z -> world.y,  phy.y -> world.z (reversed)
+			const transformPhy = (px: number, py: number, pz: number, out: number[]): void => {
+				const tx = hullMin[0]! + (px - phyMin[0]!) / phyRange[0]! * hullRange[0]!;
+				const ty = hullMin[1]! + (pz - phyMin[2]!) / phyRange[2]! * hullRange[1]!;
+				const tz = hullMax[2]! - (py - phyMin[1]!) / phyRange[1]! * hullRange[2]!;
+				out[0] = tx; out[1] = ty; out[2] = tz;
+			};
+
+			const getWorldVert = (idx: number, out: number[]): void => {
+				const i = vi.get(idx)! * 3;
+				transformPhy(verts[i]!, verts[i + 1]!, verts[i + 2]!, out);
+			};
+
+			for (const mesh of solid.convexMeshes) {
+				const edgeSet = new Set<string>();
+				const segments: number[] = [];
+				const a = [0, 0, 0], b = [0, 0, 0];
+
+				for (const face of mesh.faces) {
+					const addEdge = (va: number, vb: number): void => {
+						const key = va < vb ? `${va}-${vb}` : `${vb}-${va}`;
+						if (!edgeSet.has(key)) {
+							edgeSet.add(key);
+							getWorldVert(va, a);
+							getWorldVert(vb, b);
+							segments.push(a[0]!, a[1]!, a[2]!, b[0]!, b[1]!, b[2]!);
+						}
+					};
+					addEdge(face.vertexIndex[0]!, face.vertexIndex[1]!);
+					addEdge(face.vertexIndex[1]!, face.vertexIndex[2]!);
+					addEdge(face.vertexIndex[2]!, face.vertexIndex[0]!);
+				}
+
+				if (segments.length > 0) {
+					const geom = new LineSegmentsGeometry({ user: this });
+					geom.setSegments(segments);
+					const line = new Mesh({ geometry: geom, material: lineMat });
+					group.addChild(line);
+				}
+			}
+		}
+
+		if (group.children.size > 0) {
+			this.addChild(group);
+			this.#collisionWireframeGroup = group;
+		} else {
+			group.dispose();
+		}
+	}
+
 	replaceMaterial(material: Material, recursive = true): void {
 		super.replaceMaterial(material, recursive);
 		for (const mesh of this.#meshes) {
@@ -1206,6 +1322,14 @@ export class Source1ModelInstance extends Entity implements Animated, HasMateria
 		}
 		for (const mesh of this.#meshes) {
 			mesh.dispose();
+		}
+		if (this.#collisionWireframeGroup) {
+			this.#collisionWireframeGroup.dispose();
+			this.#collisionWireframeGroup = null;
+		}
+		if (this.#collisionWireframeMat) {
+			this.#collisionWireframeMat.removeUser(this);
+			this.#collisionWireframeMat = null;
 		}
 	}
 
