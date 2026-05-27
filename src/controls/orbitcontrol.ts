@@ -725,10 +725,13 @@ export class OrbitControl extends CameraControl {
 
 		//this.htmlElement.focus ? this.htmlElement.focus(): window.focus();
 
-		const action = this.#mouseButtons[mouseEvent.button];
+		let action = this.#mouseButtons[mouseEvent.button];
 
 		const MOUSE = { LEFT: 0, MIDDLE: 1, RIGHT: 2, ROTATE: 0, DOLLY: 1, PAN: 2, NONE: -1 };
 		const mouseButtons = { LEFT: MOUSE.ROTATE, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.PAN };
+
+		if (mouseEvent.shiftKey) action = MOUSE.PAN;
+		else if (action === MOUSE.PAN) action = MOUSE.NONE;
 
 		switch (action) {
 			case MOUSE.ROTATE:
