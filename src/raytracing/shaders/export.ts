@@ -1,6 +1,6 @@
 import { Shaders } from '../../shaders/shaders';
 export * from './includes/export';
-export * from './v2/export';
+// export * from './v2/export';
 
 import bitangent_prepass from './bitangent_prepass.wgsl';
 Shaders['bitangent_prepass.wgsl'] = bitangent_prepass;
