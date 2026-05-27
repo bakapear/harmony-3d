@@ -1,4 +1,2 @@
 node_modules/
-dist/dts/
-dist/assets/
-dist/tsdoc-metadata.json
+dist/
