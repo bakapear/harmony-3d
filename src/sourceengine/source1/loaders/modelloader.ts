@@ -32,11 +32,13 @@ export class ModelLoader {
 				const vtxPromise = new Source1VtxLoader(mdl.header.formatVersionID).load(repositoryName, fileName + '.dx90.vtx');
 				const phyPromise = this.#loadPhy(repositoryName, fileName);
 
-				Promise.all([vvdPromise, vtxPromise, phyPromise]).then(([vvd, vtx, phyData]) => {
-					if (vvd && vtx) {
-						this.#fileLoaded(resolve, repositoryName, fileName, mdl, vvd, vtx, phyData);
-					}
-				});
+			Promise.all([vvdPromise, vtxPromise, phyPromise]).then(([vvd, vtx, phyData]) => {
+				if (vvd && vtx) {
+					this.#fileLoaded(resolve, repositoryName, fileName, mdl, vvd, vtx, phyData);
+				} else {
+					resolve(null);
+				}
+			});
 			})();
 		});
 		return promise;
