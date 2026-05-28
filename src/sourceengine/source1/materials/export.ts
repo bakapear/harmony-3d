@@ -5,7 +5,7 @@ export { EyeRefractMaterial } from './eyerefractmaterial';
 export { LightMappedGenericMaterial } from './lightmappedgenericmaterial';
 export * from './proxies/export';
 export { RefractMaterial } from './refract';
-export { Source1Material } from './source1material';
+export { Source1Material, TextureRole } from './source1material';
 export { Source1MaterialManager } from './source1materialmanager';
 export { SpriteCardMaterial } from './spritecardmaterial';
 export { SpriteMaterial } from './spritematerial';

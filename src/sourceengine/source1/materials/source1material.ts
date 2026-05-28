@@ -466,6 +466,10 @@ export class Source1Material extends Material {
 		return animated?.getFrame(frame) ?? null;
 	}
 
+	getAnimatedTexture(role: TextureRole): AnimatedTexture | null {
+		return this.#textures.get(role) ?? null;
+	}
+
 	#initUniforms(): void {
 		this.setUniformValue('uDetailTextureTransform', this.#detailTextureTransform);
 	}
