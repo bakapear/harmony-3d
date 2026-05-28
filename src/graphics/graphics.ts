@@ -457,8 +457,8 @@ class Graphics {
 
 	static listenCanvas(canvas: HTMLCanvasElement): void {
 		canvas.addEventListener('mousedown', this.#mouseDownFunc);
-		canvas.addEventListener('mousemove', this.#mouseMoveFunc);
-		canvas.addEventListener('mouseup', this.#mouseUpFunc);
+		window.addEventListener('mousemove', this.#mouseMoveFunc);
+		window.addEventListener('mouseup', this.#mouseUpFunc);
 		canvas.addEventListener('click', this.#mouseClickFunc);
 		canvas.addEventListener('dblclick', this.#mouseDblClickFunc);
 		canvas.addEventListener('keydown', this.#keyDownFunc);
@@ -475,8 +475,8 @@ class Graphics {
 
 	static unlistenCanvas(canvas: HTMLCanvasElement): void {
 		canvas.removeEventListener('mousedown', this.#mouseDownFunc);
-		canvas.removeEventListener('mousemove', this.#mouseMoveFunc);
-		canvas.removeEventListener('mouseup', this.#mouseUpFunc);
+		window.removeEventListener('mousemove', this.#mouseMoveFunc);
+		window.removeEventListener('mouseup', this.#mouseUpFunc);
 		canvas.removeEventListener('click', this.#mouseClickFunc);
 		canvas.removeEventListener('dblclick', this.#mouseDblClickFunc);
 		canvas.removeEventListener('keydown', this.#keyDownFunc);
