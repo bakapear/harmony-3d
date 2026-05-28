@@ -219,6 +219,8 @@ export class CanvasAttributes {
 	readonly name: string;
 	/** Enable rendering. */
 	enabled = true;
+	/** Run rendering for this canvas. If false, the canvas is skipped in renderMultiCanvas. */
+	running = true;
 	/** Html canvas. */
 	readonly canvas: HTMLCanvasElement;
 	/** Rendering context associated with the canvas. */
@@ -655,7 +657,7 @@ class Graphics {
 	static renderMultiCanvas(delta: number, context: RenderContext = {}) {
 		// TODO: mutualize with the method render()
 		for (const [, canvas] of this.#canvases) {
-			if (canvas.enabled && (!context.pick || context.pick?.canvas === canvas.canvas)) {
+			if (canvas.enabled && canvas.running && (!context.pick || context.pick?.canvas === canvas.canvas)) {
 				this.#renderMultiCanvas(canvas, delta, context);
 			}
 		}
@@ -1272,6 +1274,25 @@ class Graphics {
 
 	static isRunning() {
 		return this.#running;
+	}
+
+	static playCanvas(name: string): void {
+		const canvas = this.#canvases.get(name);
+		if (canvas) {
+			canvas.running = true;
+		}
+	}
+
+	static pauseCanvas(name: string): void {
+		const canvas = this.#canvases.get(name);
+		if (canvas) {
+			canvas.running = false;
+		}
+	}
+
+	static isCanvasRunning(name: string): boolean {
+		const canvas = this.#canvases.get(name);
+		return canvas ? canvas.running : false;
 	}
 
 	static createFramebuffer(): WebGLFramebuffer | null {
